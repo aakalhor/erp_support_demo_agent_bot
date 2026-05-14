@@ -1,0 +1,43 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# Local-only artefacts
+storage/index.json
+tmp/
+*.log
+
+# Heavy binaries that should be downloaded locally
+bin/ffmpeg.exe
+bin/ffmpeg_extract/
+models/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Go build outputs
+/erp-voice-rag-go-mvp
+/erp-voice-rag-go-mvp.exe
+/cmd/api/api
+/cmd/api/api.exe
+/cmd/bot/bot
+/cmd/bot/bot.exe
+/cmd/indexer/indexer
+/cmd/indexer/indexer.exe
+*.test
+*.out
+coverage.*
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+Thumbs.db
