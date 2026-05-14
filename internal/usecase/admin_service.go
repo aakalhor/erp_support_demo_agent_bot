@@ -11,13 +11,17 @@ import (
 
 // AdminService is the use case behind the admin UI. It coordinates
 // repository writes with a rebuild + hot-swap of the search index so
-// the bot picks up changes without a restart.
+// the bot picks up changes without a restart, and exposes the general
+// knowledge holder so the admin can edit free-form context for the LLM.
 type AdminService struct {
 	repo      port.FAQRepository
 	builder   port.SearchIndexBuilder
 	loader    port.SearchIndexLoader
 	index     port.SearchIndexSwapper
 	indexPath string
+
+	knowledgeReader port.GeneralKnowledgeProvider
+	knowledgeWriter port.GeneralKnowledgeWriter
 }
 
 func NewAdminService(
@@ -26,14 +30,38 @@ func NewAdminService(
 	loader port.SearchIndexLoader,
 	index port.SearchIndexSwapper,
 	indexPath string,
+	knowledgeReader port.GeneralKnowledgeProvider,
+	knowledgeWriter port.GeneralKnowledgeWriter,
 ) *AdminService {
 	return &AdminService{
-		repo:      repo,
-		builder:   builder,
-		loader:    loader,
-		index:     index,
-		indexPath: indexPath,
+		repo:            repo,
+		builder:         builder,
+		loader:          loader,
+		index:           index,
+		indexPath:       indexPath,
+		knowledgeReader: knowledgeReader,
+		knowledgeWriter: knowledgeWriter,
 	}
+}
+
+// GeneralKnowledge returns the current admin-curated context. Empty
+// string means none has been set yet.
+func (s *AdminService) GeneralKnowledge() string {
+	if s.knowledgeReader == nil {
+		return ""
+	}
+	return s.knowledgeReader.Get()
+}
+
+// SaveGeneralKnowledge persists the new text and hot-updates the
+// in-memory copy used by the LLM. The change is visible to the next
+// /ask request; no reindex is needed because the FAQ corpus did not
+// change.
+func (s *AdminService) SaveGeneralKnowledge(text string) error {
+	if s.knowledgeWriter == nil {
+		return fmt.Errorf("general knowledge writer is not configured")
+	}
+	return s.knowledgeWriter.Save(text)
 }
 
 // List returns every FAQ record, in their on-disk order.

@@ -17,6 +17,7 @@ import (
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/answers"
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/config"
 	apphttp "github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/http"
+	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/knowledge"
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/llm"
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/repository"
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/search"
@@ -51,6 +52,15 @@ func main() {
 
 	safetyGen := answers.NewTemplateAnswerGenerator()
 
+	// General knowledge holder: loaded once, hot-updated by the admin
+	// UI, consulted by the LLM on every /ask call.
+	kb := knowledge.NewFileHolder(cfg.KnowledgePath)
+	if err := kb.Load(); err != nil {
+		log.Errorf("load general knowledge from %s: %v — continuing with empty knowledge", cfg.KnowledgePath, err)
+	} else if kb.Get() != "" {
+		log.Infof("general knowledge loaded from %s (%d chars)", cfg.KnowledgePath, len(kb.Get()))
+	}
+
 	// LLM + translator are optional. If the local Ollama daemon is
 	// unreachable we degrade gracefully to extractive-only answers.
 	var primary port.AnswerGenerator = safetyGen
@@ -62,7 +72,7 @@ func main() {
 			log.Errorf("ollama health check failed at %s: %v — continuing with extractive-only answers", cfg.OllamaBaseURL, err)
 		} else {
 			log.Infof("ollama OK at %s (model=%s)", cfg.OllamaBaseURL, cfg.OllamaModel)
-			primary = answers.NewOllamaAnswerGenerator(client)
+			primary = answers.NewOllamaAnswerGenerator(client, kb)
 			translator = translation.NewOllamaTranslator(client)
 		}
 		cancel()
@@ -79,10 +89,12 @@ func main() {
 		translator,
 	)
 
-	// Admin UI: wires the JSONL repo + index builder + loader + swap.
+	// Admin UI: wires the JSONL repo + index builder + loader + swap +
+	// general knowledge holder (one object satisfies both reader and
+	// writer ports).
 	repo := repository.NewJSONLRepository(cfg.SeedPath)
 	builder := search.NewBuilder()
-	adminService := usecase.NewAdminService(repo, builder, loader, swappable, cfg.IndexPath)
+	adminService := usecase.NewAdminService(repo, builder, loader, swappable, cfg.IndexPath, kb, kb)
 	adminHandler, err := apphttp.NewAdminHandler(adminService, log)
 	if err != nil {
 		log.Errorf("admin handler init: %v", err)

@@ -390,11 +390,13 @@ What you can do:
 - **Edit** any record's fields (question, answer, module, risk level, escalation flag, tags, etc.).
 - **Delete** a record (with a JS confirm prompt).
 - **Reindex** on demand. Every Create / Update / Delete already triggers an automatic reindex; the button is there for cases where you edit `data/seed_faq.jsonl` directly on disk.
+- **General Knowledge** panel: a single free-form textarea + **Submit to bot** button. Anything you type there is included as authoritative additional context in every LLM call (alongside retrieved FAQs). Use it for facts that don't fit the FAQ schema — office hours, headquarters, team members, recent announcements. The change takes effect on the next message; no restart, no reindex. Submitting an empty textarea clears the context.
 
 Under the hood:
 
 - Writes go through `internal/usecase/admin_service.go` → `JSONLRepository` rewrites `data/seed_faq.jsonl` atomically (temp file + rename, mutex-protected).
 - After every write, the indexer rebuilds `storage/index.json` and the API **hot-swaps** the in-memory search index via a `SearchIndexSwapper` port. Active `/ask` requests aren't interrupted; the next one sees the new corpus.
+- General knowledge is persisted at `data/general_knowledge.md` via the same atomic-rename pattern and held behind a `GeneralKnowledgeProvider` port. The `OllamaAnswerGenerator` reads it via `Get()` on every call, so a Submit is visible to the very next message.
 - The admin UI is plain server-rendered HTML (`html/template`, no JS framework, no build step). Templates are embedded into the Go binary with `go:embed`.
 - **No authentication**. The API binds to localhost by default; this is fine for a single-user local demo but **do not expose the admin UI to the public internet without adding auth**.
 

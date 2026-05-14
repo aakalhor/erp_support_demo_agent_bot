@@ -21,6 +21,7 @@ type Config struct {
 	TmpDir           string
 	SeedPath         string
 	IndexPath        string
+	KnowledgePath    string
 
 	// LLM
 	OllamaBaseURL string
@@ -52,6 +53,7 @@ func Load() (*Config, error) {
 		TmpDir:             envOrDefault("TMP_DIR", "./tmp"),
 		SeedPath:           envOrDefault("SEED_PATH", "./data/seed_faq.jsonl"),
 		IndexPath:          envOrDefault("INDEX_PATH", "./storage/index.json"),
+		KnowledgePath:      envOrDefault("KNOWLEDGE_PATH", "./data/general_knowledge.md"),
 		OllamaBaseURL:      envOrDefault("OLLAMA_BASE_URL", "http://localhost:11434"),
 		OllamaModel:        envOrDefault("OLLAMA_MODEL", "qwen3:8b"),
 		LLMEnabled:         envBool("LLM_ENABLED", true),

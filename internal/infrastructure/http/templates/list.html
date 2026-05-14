@@ -1,4 +1,28 @@
 {{define "content"}}
+
+<section class="kb-panel">
+  <div class="kb-head">
+    <h2>General Knowledge</h2>
+    <span class="kb-meta">Free-form context the bot includes alongside every matched FAQ. Use it for facts that don't fit the FAQ schema (office hours, team, recent announcements, etc.).</span>
+  </div>
+  <form method="POST" action="/admin/knowledge" class="kb-form">
+    <textarea name="text" rows="8" placeholder="e.g.&#10;- Office hours: Mon-Fri 9am-5pm PT&#10;- HQ: Seattle, WA&#10;- We are running a free Go-Live readiness review through Q3.">{{.GeneralKnowledge}}</textarea>
+    <div class="kb-actions">
+      <span class="kb-meta">Empty submission clears the context. Changes take effect on the next message.</span>
+      <button type="submit" class="btn">Submit to bot</button>
+    </div>
+  </form>
+</section>
+
+<style>
+  .kb-panel { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 8px; padding: 18px; margin-bottom: 20px; }
+  .kb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 10px; flex-wrap: wrap; }
+  .kb-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .kb-meta { color: var(--muted); font-size: 12px; }
+  .kb-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 6px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; line-height: 1.5; resize: vertical; min-height: 140px; }
+  .kb-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+</style>
+
 <div class="toolbar">
   <input id="q" type="search" placeholder="Search question, answer, tags, module..." autofocus />
   <select id="client-filter">

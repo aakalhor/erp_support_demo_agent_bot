@@ -60,20 +60,22 @@ func (h *AdminHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /admin/faq/{id}", h.update)
 	mux.HandleFunc("POST /admin/faq/{id}/delete", h.delete)
 	mux.HandleFunc("POST /admin/reindex", h.reindex)
+	mux.HandleFunc("POST /admin/knowledge", h.saveKnowledge)
 }
 
 // pageData is the value passed to every template. Keep keys here in
 // sync with the layout/list/edit templates.
 type pageData struct {
-	Title      string
-	Stats      string
-	Flash      string
-	FlashKind  string // "ok" | "err"
-	Records    []domain.FAQRecord
-	Clients    []string
-	Record     domain.FAQRecord
-	IsNew      bool
-	PostAction string
+	Title            string
+	Stats            string
+	Flash            string
+	FlashKind        string // "ok" | "err"
+	Records          []domain.FAQRecord
+	Clients          []string
+	Record           domain.FAQRecord
+	IsNew            bool
+	PostAction       string
+	GeneralKnowledge string
 }
 
 func (h *AdminHandler) list(w http.ResponseWriter, r *http.Request) {
@@ -88,16 +90,34 @@ func (h *AdminHandler) list(w http.ResponseWriter, r *http.Request) {
 	flash, kind := flashFromQuery(r.URL.Query())
 
 	data := pageData{
-		Title:     "FAQs",
-		Stats:     stats,
-		Flash:     flash,
-		FlashKind: kind,
-		Records:   records,
-		Clients:   clients,
+		Title:            "FAQs",
+		Stats:            stats,
+		Flash:            flash,
+		FlashKind:        kind,
+		Records:          records,
+		Clients:          clients,
+		GeneralKnowledge: h.service.GeneralKnowledge(),
 	}
 	if err := h.tplList.ExecuteTemplate(w, "layout", data); err != nil {
 		h.log.Errorf("render list: %v", err)
 	}
+}
+
+func (h *AdminHandler) saveKnowledge(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		h.redirectFlash(w, r, "/admin", "Invalid form: "+err.Error(), "err")
+		return
+	}
+	text := r.FormValue("text")
+	if err := h.service.SaveGeneralKnowledge(text); err != nil {
+		h.redirectFlash(w, r, "/admin", "Submit failed: "+err.Error(), "err")
+		return
+	}
+	msg := "General knowledge submitted to the bot."
+	if strings.TrimSpace(text) == "" {
+		msg = "General knowledge cleared; the bot will rely solely on the FAQs."
+	}
+	h.redirectFlash(w, r, "/admin", msg, "ok")
 }
 
 func (h *AdminHandler) newForm(w http.ResponseWriter, r *http.Request) {
