@@ -1,6 +1,6 @@
 // Command api starts the local RAG HTTP API on PORT (default 8080).
-// It refuses to start if the index file is missing — run the indexer
-// first.
+// It also serves the admin UI at /admin so the knowledge base can be
+// edited without restarting anything.
 package main
 
 import (
@@ -18,6 +18,7 @@ import (
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/config"
 	apphttp "github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/http"
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/llm"
+	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/repository"
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/search"
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/infrastructure/translation"
 	"github.com/acuman-demo/erp-voice-rag-go-mvp/internal/port"
@@ -34,7 +35,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	idx, err := search.NewLoader().Load(cfg.IndexPath)
+	loader := search.NewLoader()
+	initialIdx, err := loader.Load(cfg.IndexPath)
 	if err != nil {
 		if errors.Is(err, domain.ErrIndexNotFound) {
 			log.Errorf("Index not found at %s. Run: go run ./cmd/indexer", cfg.IndexPath)
@@ -43,6 +45,9 @@ func main() {
 		log.Errorf("load index: %v", err)
 		os.Exit(1)
 	}
+	// SwappableIndex lets the admin hot-reload the index after edits
+	// without restarting the API.
+	swappable := search.NewSwappableIndex(initialIdx)
 
 	safetyGen := answers.NewTemplateAnswerGenerator()
 
@@ -65,8 +70,8 @@ func main() {
 		log.Infof("LLM disabled by config; using extractive answers only")
 	}
 
-	ask := usecase.NewAskService(
-		idx,
+	askService := usecase.NewAskService(
+		swappable,
 		usecase.NewIntentClassifier(),
 		usecase.NewRiskDetector(),
 		safetyGen,
@@ -74,7 +79,22 @@ func main() {
 		translator,
 	)
 
-	router := apphttp.NewRouter(apphttp.NewAskHandler(ask), apphttp.NewHealthHandler(), log)
+	// Admin UI: wires the JSONL repo + index builder + loader + swap.
+	repo := repository.NewJSONLRepository(cfg.SeedPath)
+	builder := search.NewBuilder()
+	adminService := usecase.NewAdminService(repo, builder, loader, swappable, cfg.IndexPath)
+	adminHandler, err := apphttp.NewAdminHandler(adminService, log)
+	if err != nil {
+		log.Errorf("admin handler init: %v", err)
+		os.Exit(1)
+	}
+
+	router := apphttp.NewRouter(
+		apphttp.NewAskHandler(askService),
+		apphttp.NewHealthHandler(),
+		adminHandler,
+		log,
+	)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	srv := &http.Server{
@@ -88,6 +108,7 @@ func main() {
 
 	go func() {
 		log.Infof("listening on %s (index: %s)", addr, cfg.IndexPath)
+		log.Infof("admin UI available at http://localhost%s/admin", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Errorf("http server: %v", err)
 			stop()

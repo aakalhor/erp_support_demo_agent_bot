@@ -5,6 +5,7 @@ package transcription
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,10 +16,14 @@ import (
 
 // FFmpegConverter implements port.AudioConverter by shelling out to a
 // local ffmpeg binary. The output is 16 kHz mono PCM WAV, which is what
-// whisper.cpp expects.
+// whisper.cpp / faster-whisper expects.
 type FFmpegConverter struct {
 	binary string
 }
+
+// ffmpegTimeout bounds every ffmpeg run so a malformed audio file
+// cannot stall the bot forever.
+const ffmpegTimeout = 60 * time.Second
 
 func NewFFmpegConverter(binary string) *FFmpegConverter {
 	if strings.TrimSpace(binary) == "" {
@@ -37,14 +42,15 @@ func (c *FFmpegConverter) ToWAV(inputPath string, outputDir string) (string, err
 	stamp := time.Now().UnixNano()
 	outPath := filepath.Join(outputDir, fmt.Sprintf("%s-%d.wav", base, stamp))
 
-	// -y      : overwrite output
-	// -i      : input
-	// -ar 16000: 16 kHz (whisper's expected sample rate)
-	// -ac 1   : mono
-	cmd := exec.Command(c.binary, "-y", "-i", inputPath, "-ar", "16000", "-ac", "1", outPath)
+	ctx, cancel := context.WithTimeout(context.Background(), ffmpegTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, c.binary, "-y", "-i", inputPath, "-ar", "16000", "-ac", "1", outPath)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("ffmpeg timed out after %s converting %s; stderr: %s", ffmpegTimeout, inputPath, strings.TrimSpace(stderr.String()))
+		}
 		return "", fmt.Errorf("ffmpeg failed (binary %q): %w; stderr: %s", c.binary, err, strings.TrimSpace(stderr.String()))
 	}
 	return outPath, nil

@@ -1,0 +1,63 @@
+{{define "content"}}
+<div class="toolbar">
+  <input id="q" type="search" placeholder="Search question, answer, tags, module..." autofocus />
+  <select id="client-filter">
+    <option value="">All clients</option>
+    {{range .Clients}}
+      <option value="{{.}}">{{.}}</option>
+    {{end}}
+  </select>
+  <select id="risk-filter">
+    <option value="">All risk levels</option>
+    <option value="low">Low</option>
+    <option value="medium">Medium</option>
+    <option value="high">High</option>
+  </select>
+  <span style="flex:1"></span>
+  <form method="POST" action="/admin/reindex" style="margin:0">
+    <button type="submit" class="btn secondary" title="Rebuild the search index from the current corpus">Reindex</button>
+  </form>
+  <a class="btn" href="/admin/faq/new">+ New FAQ</a>
+</div>
+
+{{if .Records}}
+<table>
+  <thead>
+    <tr>
+      <th style="width: 100px">ID</th>
+      <th style="width: 110px">Client</th>
+      <th style="width: 130px">Module</th>
+      <th style="width: 90px">Risk</th>
+      <th>Question</th>
+      <th style="width: 170px">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Records}}
+      <tr data-faq="{{.ID}}"
+          data-client="{{.ClientID}}"
+          data-risk="{{.RiskLevel}}"
+          data-search="{{searchBlob .}}">
+        <td><code>{{.ID}}</code></td>
+        <td><span class="badge client">{{.ClientID}}</span></td>
+        <td>{{.Module}}</td>
+        <td>
+          <span class="badge {{.RiskLevel}}">{{.RiskLevel}}</span>
+          {{if .EscalationRequired}}<span class="badge escalate">escalate</span>{{end}}
+        </td>
+        <td class="truncate">{{.Question}}</td>
+        <td class="actions">
+          <a class="btn ghost" href="/admin/faq/{{.ID}}/edit">Edit</a>
+          <form method="POST" action="/admin/faq/{{.ID}}/delete"
+                onsubmit="return confirm('Delete &quot;{{.ID}}&quot;?');">
+            <button type="submit" class="btn danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<div class="empty">No FAQs yet. <a href="/admin/faq/new">Create the first one</a>.</div>
+{{end}}
+{{end}}

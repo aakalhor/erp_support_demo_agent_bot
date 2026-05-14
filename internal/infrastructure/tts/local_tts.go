@@ -98,7 +98,10 @@ func (s *LocalSynthesizer) Speak(text string, lang domain.Language, outputDir st
 	}
 
 	// 2. WAV -> OGG/Opus via ffmpeg (Telegram voice-note format).
-	enc := exec.Command(
+	encCtx, encCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer encCancel()
+	enc := exec.CommandContext(
+		encCtx,
 		s.ffmpegPath, "-y",
 		"-i", wavPath,
 		"-c:a", "libopus",
@@ -110,6 +113,9 @@ func (s *LocalSynthesizer) Speak(text string, lang domain.Language, outputDir st
 	var encErr bytes.Buffer
 	enc.Stderr = &encErr
 	if err := enc.Run(); err != nil {
+		if encCtx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("ffmpeg wav->ogg timed out after 60s; stderr: %s", strings.TrimSpace(encErr.String()))
+		}
 		return "", fmt.Errorf("ffmpeg wav->ogg failed: %w; stderr: %s", err, strings.TrimSpace(encErr.String()))
 	}
 	_ = os.Remove(wavPath)

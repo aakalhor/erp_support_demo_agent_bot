@@ -23,6 +23,8 @@ own answers.
 - [One-time setup](#one-time-setup)
 - [Run](#run)
 - [Testing](#testing)
+- [Admin UI](#admin-ui)
+- [Resilience and failure handling](#resilience-and-failure-handling)
 - [Example questions](#example-questions)
 - [Safety model](#safety-model)
 - [How retrieval scores a match](#how-retrieval-scores-a-match)
@@ -373,6 +375,59 @@ Covers:
 - High-risk action detection on phrases like "delete a transaction".
 - Client isolation (`client_alpha` never sees `client_beta` records).
 - Low-confidence non-critical queries no longer auto-escalate (matches the humanized policy).
+
+---
+
+## Admin UI
+
+The API serves a small web admin at **<http://localhost:8080/admin>** so
+the knowledge base can be edited without restarting anything.
+
+What you can do:
+
+- **List + filter** the corpus by client, by risk level, or by free-text search across question/answer/tags.
+- **Create** a new FAQ. ID is auto-generated if you leave it blank.
+- **Edit** any record's fields (question, answer, module, risk level, escalation flag, tags, etc.).
+- **Delete** a record (with a JS confirm prompt).
+- **Reindex** on demand. Every Create / Update / Delete already triggers an automatic reindex; the button is there for cases where you edit `data/seed_faq.jsonl` directly on disk.
+
+Under the hood:
+
+- Writes go through `internal/usecase/admin_service.go` → `JSONLRepository` rewrites `data/seed_faq.jsonl` atomically (temp file + rename, mutex-protected).
+- After every write, the indexer rebuilds `storage/index.json` and the API **hot-swaps** the in-memory search index via a `SearchIndexSwapper` port. Active `/ask` requests aren't interrupted; the next one sees the new corpus.
+- The admin UI is plain server-rendered HTML (`html/template`, no JS framework, no build step). Templates are embedded into the Go binary with `go:embed`.
+- **No authentication**. The API binds to localhost by default; this is fine for a single-user local demo but **do not expose the admin UI to the public internet without adding auth**.
+
+---
+
+## Resilience and failure handling
+
+The pipeline has several places where an external dependency could
+stall (ffmpeg, Whisper, Ollama, TTS, Telegram file downloads). Every
+one of them is now bounded:
+
+| Step                                           | Timeout            | Behaviour on failure                                                          |
+| ---------------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| Telegram voice file download (`http.Get`)      | 60s                | Bot replies with the specific error and stops cleanly.                        |
+| ffmpeg ogg→wav / wav→opus                      | 60s per invocation | Bot replies with the ffmpeg stderr and skips the voice reply.                 |
+| `/transcribe` HTTP to voice service            | 3 min              | Bot replies "Local transcription failed: …".                                  |
+| `/speak` HTTP to voice service                 | 2 min              | Voice reply is skipped; the text reply still goes out.                        |
+| `/ask` HTTP handler                            | 4 min (hard cap)   | Returns `504 Gateway Timeout` with a useful message; bot relays it.           |
+| Ollama chat (translation + answer)             | 5 min              | AskService falls through to the curated safety template; never returns empty. |
+| Voice service startup wait at bot launch       | 3 min              | Bot exits with a clear log pointing at `tmp/voice_service.log`.               |
+
+Other guards:
+
+- **Bot handlers run under a `defer recover()`**. A panic anywhere in
+  transcription, retrieval, or TTS replies with an apology rather than
+  silently killing the long-poll loop.
+- **Unsupported language on voice**. If Whisper confidently detects a
+  language other than English or Punjabi (`prob >= 0.6`), the bot
+  replies with the transcript and a polite "I only support English and
+  Punjabi right now" instead of pushing mojibake through Qwen and
+  MMS-TTS.
+- **Hot index swap** uses `RWMutex`. Active `/ask` calls finish on the
+  old index; new ones see the new index after a reindex.
 
 ---
 

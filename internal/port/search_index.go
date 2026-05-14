@@ -31,3 +31,12 @@ type BuildStats struct {
 type SearchIndexLoader interface {
 	Load(path string) (SearchIndex, error)
 }
+
+// SearchIndexSwapper is implemented by indexes that support being
+// hot-replaced at runtime (e.g. after the admin edits the corpus and
+// triggers a reindex). The use case layer depends only on this port,
+// not on the concrete swappable implementation in infrastructure.
+type SearchIndexSwapper interface {
+	SearchIndex
+	Swap(next SearchIndex)
+}

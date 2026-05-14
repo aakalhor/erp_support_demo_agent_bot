@@ -85,6 +85,14 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 		return
 	}
 	msg := update.Message
+	// One panic from any handler should not kill the long-poll loop,
+	// nor leave the user staring at silence. Recover and apologise.
+	defer func() {
+		if r := recover(); r != nil {
+			b.log.Errorf("panic handling update for chat %d: %v", msg.Chat.ID, r)
+			b.reply(msg.Chat.ID, "Sorry — something went wrong while handling that message. Please try again.")
+		}
+	}()
 	switch {
 	case msg.Voice != nil:
 		b.handleVoice(msg)
@@ -134,7 +142,22 @@ func (b *Bot) handleVoice(msg *tgbotapi.Message) {
 		return
 	}
 
-	// Whisper-detected language overrides script detection.
+	// If Whisper confidently detected a language we don't support
+	// (anything other than English or Punjabi), short-circuit with a
+	// friendly explanation instead of trying to push gibberish through
+	// the LLM and TTS pipeline (which is what made the bot appear to
+	// "stick").
+	if !tr.Language.IsSupported() && tr.Language != domain.LangAuto && tr.LanguageProbability >= 0.6 {
+		b.reply(msg.Chat.ID, fmt.Sprintf(
+			"I heard:\n%s\n\nIt sounds like that was in %q, but this demo only supports English and Punjabi right now. Could you say it again in one of those?",
+			transcript, tr.Language,
+		))
+		return
+	}
+
+	// Whisper-detected language overrides script detection. If Whisper
+	// returned LangAuto or an unsupported code at low confidence, fall
+	// back to script detection on the transcript.
 	lang := tr.Language
 	if !lang.IsSupported() {
 		lang = detectTextLanguage(transcript)

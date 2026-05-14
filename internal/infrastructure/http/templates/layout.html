@@ -1,0 +1,115 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{.Title}} — ERP FAQ Admin</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-soft: #1e293b;
+      --panel: #ffffff;
+      --panel-border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --ok: #16a34a;
+      --warn: #d97706;
+      --critical: #dc2626;
+      --soft: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--soft); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header { background: var(--bg); color: #f1f5f9; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: 0.2px; }
+    header .meta { font-size: 12px; color: #94a3b8; }
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .flash { padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+    .flash.ok { background: #dcfce7; color: #14532d; border: 1px solid #86efac; }
+    .flash.err { background: #fee2e2; color: #7f1d1d; border: 1px solid #fca5a5; }
+    .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .toolbar input[type="search"], .toolbar select { padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 6px; font: inherit; background: var(--panel); }
+    .toolbar input[type="search"] { min-width: 280px; }
+    .btn { display: inline-block; padding: 8px 14px; border-radius: 6px; font-size: 14px; cursor: pointer; border: 1px solid transparent; background: var(--accent); color: white; font-weight: 500; }
+    .btn:hover { background: var(--accent-hover); text-decoration: none; }
+    .btn.secondary { background: var(--panel); color: var(--text); border-color: var(--panel-border); }
+    .btn.secondary:hover { background: #f1f5f9; }
+    .btn.danger { background: var(--danger); }
+    .btn.danger:hover { background: var(--danger-hover); }
+    .btn.ghost { background: transparent; color: var(--text); border-color: var(--panel-border); }
+    table { width: 100%; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 8px; border-collapse: separate; border-spacing: 0; overflow: hidden; font-size: 13px; }
+    th, td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--panel-border); }
+    th { background: #f1f5f9; font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    .truncate { max-width: 480px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
+    .badge.low { background: #dcfce7; color: #14532d; }
+    .badge.medium { background: #fef3c7; color: #78350f; }
+    .badge.high { background: #fee2e2; color: #7f1d1d; }
+    .badge.escalate { background: #fde68a; color: #78350f; margin-left: 4px; }
+    .badge.client { background: #e0e7ff; color: #3730a3; font-family: ui-monospace, "SF Mono", monospace; font-weight: 500; }
+    .actions { display: flex; gap: 6px; }
+    .actions form { margin: 0; }
+    .empty { padding: 32px; text-align: center; color: var(--muted); background: var(--panel); border: 1px dashed var(--panel-border); border-radius: 8px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; background: var(--panel); padding: 24px; border-radius: 8px; border: 1px solid var(--panel-border); }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-grid label { display: block; font-weight: 600; font-size: 13px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .form-grid input[type="text"], .form-grid select, .form-grid textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 6px; font: inherit; }
+    .form-grid textarea { min-height: 110px; resize: vertical; font-family: inherit; }
+    .form-grid small { color: var(--muted); font-size: 12px; }
+    .form-grid .checkbox-row { display: flex; align-items: center; gap: 8px; padding-top: 24px; }
+    .form-grid .checkbox-row input { width: auto; margin: 0; }
+    .form-grid .checkbox-row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
+    .form-actions { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+    .form-actions .left { margin-right: auto; }
+    .meta-line { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+    code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ERP FAQ Admin</h1>
+    <div class="meta">{{.Stats}}</div>
+  </header>
+  <main>
+    {{if .Flash}}
+      <div class="flash {{.FlashKind}}">{{.Flash}}</div>
+    {{end}}
+    {{template "content" .}}
+  </main>
+  <script>
+    // Lightweight client-side filter for the list page.
+    (function () {
+      const search = document.getElementById('q');
+      const clientFilter = document.getElementById('client-filter');
+      const riskFilter = document.getElementById('risk-filter');
+      const rows = document.querySelectorAll('tbody tr[data-faq]');
+      if (!rows.length) return;
+
+      function applyFilters() {
+        const q = (search && search.value || '').toLowerCase();
+        const c = clientFilter ? clientFilter.value : '';
+        const r = riskFilter ? riskFilter.value : '';
+        rows.forEach((row) => {
+          const text = row.getAttribute('data-search') || '';
+          const client = row.getAttribute('data-client') || '';
+          const risk = row.getAttribute('data-risk') || '';
+          const matchesQ = !q || text.includes(q);
+          const matchesC = !c || client === c;
+          const matchesR = !r || risk === r;
+          row.style.display = matchesQ && matchesC && matchesR ? '' : 'none';
+        });
+      }
+      if (search) search.addEventListener('input', applyFilters);
+      if (clientFilter) clientFilter.addEventListener('change', applyFilters);
+      if (riskFilter) riskFilter.addEventListener('change', applyFilters);
+    })();
+  </script>
+</body>
+</html>{{end}}
